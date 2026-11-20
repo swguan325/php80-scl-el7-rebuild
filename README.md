@@ -1,6 +1,6 @@
 # php80-scl-el7-rebuild
 
-Unofficial rebuild of Remi Collet's **`php80-php` 8.0.30-21** SCL packages for
+Unofficial rebuild of Remi Collet's **`php80-php` 8.0.30-22** SCL packages for
 **CentOS/RHEL 7**, which Remi stopped building at `8.0.30-6` in June 2024.
 
 Nothing here is new code. It is Remi's own source RPM, rebuilt for EL7 with
@@ -13,7 +13,7 @@ Remi's EL7 repository for PHP 8.0 was frozen at `8.0.30-6` (2024-06-14), while
 the `php80-php` source RPM kept receiving backported security fixes. Rebuilding
 `-21` for EL7 closes that gap.
 
-Between `-6` and `-21`, Remi's changelog records **44 CVEs**, among them:
+Between `-6` and `-22`, Remi's changelog records **57 CVEs**, among them:
 
 | CVE | |
 |---|---|
@@ -23,6 +23,24 @@ Between `-6` and `-21`, Remi's changelog records **44 CVEs**, among them:
 | CVE-2026-93682 | OOB read in the HTTP stream wrapper on empty `Location` |
 | CVE-2025-1218 | packet overreads in the mysqlnd wire protocol |
 | CVE-2026-6103 | integer overflow in `phar_tar_number()` |
+
+`-22` (2026-11-18) adds the backport of PHP's 19 November 2026 security release
+— 13 further CVEs, carried over as `php-from-8.2.36-to-8.0.patch`:
+
+| CVE | |
+|---|---|
+| CVE-2026-129289 | PHP-FPM request smuggling through an unread request body, CVSS 9.2 |
+| CVE-2026-126714 | partially overwritten session files can lead to RCE |
+| CVE-2026-129496 | timezone cache use-after-free can lead to RCE |
+| CVE-2026-115560 | session serializer mismatch; mitigated by defaulting `session.upload_progress.enabled` to off |
+| CVE-2026-129538 | PHP-CGI out-of-bounds read/write during `PATH_INFO` correction |
+| CVE-2026-128090 | PHAR OpenSSL signature bypass via algorithm downgrade |
+
+Note that **CVE-2026-129481**, the session use-after-free that PHP describes as
+an incomplete fix for CVE-2026-109619, is *not* in this backport. Upstream lists
+it as affecting 8.3–8.5. PHP's recommended mitigation for unsupported branches
+— `session.upload_progress.enabled = 0` in `php.ini` — is what `-21` already
+hard-codes and `-22` makes the compiled-in default.
 
 The full list is in `docs/cves.txt`.
 
@@ -39,9 +57,10 @@ includes mine.
 
 | | |
 |---|---|
-| Source | `https://rpms.remirepo.net/SRPMS/php80-php-8.0.30-21.remi.src.rpm` |
-| SHA-256 | `08579b2c1ee97d3f431a0bb088102e554f8346fb6852d458cbcb7335bb2b1ea8` |
+| Source | `https://rpms.remirepo.net/SRPMS/php80-php-8.0.30-22.remi.src.rpm` |
+| SHA-256 | `f2a460232cdad93f1f300a682bcaaf0eb001e861f49282cf23b06eff8c78f594` |
 | Upstream signing key | Remi Collet, `2E37 5FE2 4EDF F0F2 E0D8 E165 ED5B 58C5 BEFA 00E2` |
+| Signature | EdDSA/SHA512, 2026-11-18 — see pothole 3 below |
 | Spec in the SRPM | `php.spec`, `Name: %{?scl_prefix}php` |
 | Licenses | `PHP and Zend and BSD and MIT and ASL 1.0 and NCSA`; Remi's packaging is MIT |
 
@@ -61,7 +80,7 @@ Fix GHSA-6wmf-4rv5-p3rp (CVE-2026-109619)
 `patches/php.spec.el7.patch` is the whole of it — 99 lines, touching only the
 spec file. **No source file and no patch from the SRPM is modified.**
 
-1. **`pkgconfig(icu-*) >= 74` → `>= 73`.** Remi's EL7 archive tops out at
+1. **`pkgconfig(icu-*) >= 78` → `>= 73`.** Remi's EL7 archive tops out at
    `libicu73-73.2`. PHP 8.0's `intl` needs ICU >= 50 upstream, so 73 is ample.
 2. **Eight `Recommends:` lines removed.** EL7's rpm 4.11 does not understand
    weak dependencies.
@@ -96,7 +115,7 @@ the running site is unaffected until you repoint it yourself.
 yum -y --enablerepo=remi localinstall \
   php80-php-common-*.rpm php80-php-cli-*.rpm php80-php-fpm-*.rpm \
   php80-php-xml-*.rpm php80-php-mbstring-*.rpm php80-php-mysqlnd-*.rpm \
-  php80-php-pdo-*.rpm php80-php-opcache-*.rpm php80-php-gd-*.rpm
+  php80-php-pdo-8*.rpm php80-php-opcache-*.rpm php80-php-gd-*.rpm
 ```
 
 `php80-runtime` comes from Remi's EL7 repository and is pulled in automatically;
@@ -162,13 +181,13 @@ for CVE-2026-109619 — but if you rely on upload progress tracking, it is gone.
 
 ## Rebuilding for a newer Remi release
 
-When Remi publishes `-22` or later, edit `SRPM_URL` and `SRPM_SHA256` in
+When Remi publishes `-23` or later, edit `SRPM_URL` and `SRPM_SHA256` in
 `build/build.sh` and run `./build/run.sh` again. The three adjustments are
 unlikely to change; if the build fails in `%prep`, re-read section
 "The three EL7 adjustments" — it will be another EL7-vs-modern-distro assumption
 of the same kind.
 
-## Two EL7 potholes you will hit anyway
+## Three EL7 potholes you will hit anyway
 
 Independent of PHP, and worth knowing if you still run EL7:
 
@@ -179,11 +198,20 @@ Independent of PHP, and worth knowing if you still run EL7:
 2. **`/etc/yum.repos.d/CentOS-SCLo-scl.repo` ships with its `baseurl` commented
    out** and no mirrorlist, so `centos-sclo-sclo` cannot resolve at all. Write
    the baseurl by hand.
+3. **Remi now signs with EdDSA/SHA512.** EL7's rpm 4.11 cannot parse that
+   algorithm, so `rpm --checksig` on the source RPM reports *"skipping package
+   with unverifiable signature"* and `rpm -qpi` then follows with *"not an rpm
+   package"*. The package is fine; the verifier is too old. Check the signature
+   on a host with rpm >= 4.16 (`rpm --import` the `remi2026` key first), and on
+   EL7 pin the SHA-256 instead — which is what `build/build.sh` does.
+   Separately, `rpm -i` of the source RPM fails on EL7 with *"Missing rpmlib
+   features: rpmlib(RichDependencies)"*, and `--nodeps` does not bypass it, so
+   the build unpacks it with `rpm2cpio | cpio` rather than installing it.
 
 ## Status
 
-Built from Remi `8.0.30-21` (2026-10-21). A one-off rebuild — **no promise of
-future updates**. If Remi has published a newer release, what is described here
+Built from Remi `8.0.30-22` (2026-11-18). Rebuilt ad hoc when a release looks
+worth it — **no promise of future updates**. If Remi has published a newer release, what is described here
 is out of date: rebuild it yourself with `build/`.
 
 Not affiliated with, endorsed by, or supported by Remi Collet, the PHP project,

@@ -1,10 +1,10 @@
 #!/bin/bash
-# Rebuild Remi's php80-php 8.0.30-21 SCL packages for EL7 (CentOS/RHEL 7).
+# Rebuild Remi's php80-php 8.0.30-22 SCL packages for EL7 (CentOS/RHEL 7).
 # Runs INSIDE a centos:7 container. See run.sh for the wrapper.
 set -euo pipefail
 
-SRPM_URL="https://rpms.remirepo.net/SRPMS/php80-php-8.0.30-21.remi.src.rpm"
-SRPM_SHA256="08579b2c1ee97d3f431a0bb088102e554f8346fb6852d458cbcb7335bb2b1ea8"
+SRPM_URL="https://rpms.remirepo.net/SRPMS/php80-php-8.0.30-22.remi.src.rpm"
+SRPM_SHA256="f2a460232cdad93f1f300a682bcaaf0eb001e861f49282cf23b06eff8c78f594"
 # CentOS 7 vault mirror. NOTE: vault.centos.org itself now returns HTTP 403 for
 # *-primary.sqlite.bz2 (repomd.xml still lists them), which breaks yum entirely.
 VAULT="http://archive.kernel.org/centos-vault/7.9.2009"
